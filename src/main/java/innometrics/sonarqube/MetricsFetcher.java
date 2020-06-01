@@ -7,11 +7,12 @@ import org.json.JSONObject;
 
 import java.awt.*;
 import java.io.*;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.net.*;
+
 import org.json.*;
 
+import org.apache.commons.codec.binary.Base64;
+import org.sonar.api.SonarPlugin;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -37,8 +38,50 @@ public class MetricsFetcher {
     @Autowired
     SecurityService securityService;
 
+    public void createHook(URL url, String componentName) throws IOException {
+        Authenticator.setDefault(new Authenticator(){
+            protected PasswordAuthentication getPasswordAuthentication() {
+                return new PasswordAuthentication("admin","admin".toCharArray());
+            }
+        });
+        String ip;
+        URL whatismyip = new URL("http://checkip.amazonaws.com");
+        BufferedReader in = new BufferedReader(new InputStreamReader(
+                whatismyip.openStream()));
+        ip=in.readLine();
+        //ip="52.29.65.138";
+        URL newUrl=new URL(url+"?project="+componentName+"&url=http://"+ip+":9096/webhook&name=InnoMetricsWebHook");
+        //URL newUrl=new URL("http://localhost:9000/api/webhooks/create?project=digital_library&url=http://52.29.65.138:9095/webhook&name=InnoMetricsWebHook");
+        HttpURLConnection connection=(HttpURLConnection)newUrl.openConnection();
+        String userPassword = "admin:admin";
+
+        connection.setRequestProperty("Authorization","Basic "+ new String(Base64.encodeBase64(userPassword.getBytes())));
+        connection.setRequestMethod("POST");
+        connection.setAuthenticator(Authenticator.getDefault());
+        connection.setRequestProperty("Content-Type","JSON");
+        connection.setRequestProperty("Content-Language", "en-US");
+        connection.setUseCaches(false);
+        connection.setDoOutput(true);
+        DataOutputStream outputStream = new DataOutputStream(connection.getOutputStream());
+        //outputStream.writeBytes("login=admin&password=admin");
+        outputStream.writeBytes("");
+        outputStream.close();
+
+        InputStream is = connection.getInputStream();
+        BufferedReader rd = new BufferedReader(new InputStreamReader(is));
+        StringBuilder response = new StringBuilder(); // or StringBuffer if Java version 5+
+        String line;
+        while ((line = rd.readLine()) != null) {
+            response.append(line);
+            response.append('\r');
+        }
+        rd.close();
+        System.out.println(response.toString());
+    }
+
     public void fetch(URL url, String ... params) throws IOException, JSONException {
         URL newUrl=new URL(concatenateParams(url,params));
+        System.out.println(newUrl);
         HttpURLConnection connection=(HttpURLConnection) newUrl.openConnection();
         connection.setRequestMethod("GET");
         connection.setRequestProperty("Content-Type","JSON");
